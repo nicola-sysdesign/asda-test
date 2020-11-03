@@ -16,21 +16,23 @@
 namespace delta { namespace asda { namespace ethercat {
 
 
-inline int slave_setup(uint16 slave)
+inline int slave_setup(uint16 slave_idx)
 {
   int wkc = 0;
 
-  // PDO mapping
-  uint16 sdo_1c12[] = { 0x01, RX_PDO2_IDX };     // RxPDO2
-  uint16 sdo_1c13[] = { 0x01, TX_PDO2_IDX };     // TxPDO2
-  wkc += writeSDO<uint16>(slave, SYNC_MANAGER_OUTPUT_PARAMETER_IDX, 0x00, sdo_1c12);
-  wkc += writeSDO<uint16>(slave, SYNC_MANAGER_INPUT_PARAMETER_IDX, 0x00, sdo_1c13);
+  // PDO Mapping
+  uint16 sdo_1c12[] = { 0x01, 0x1601 };
+  uint16 sdo_1c13[] = { 0x01, 0x1A01 };
+  wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x00, sdo_1c12[0]);
+  wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x00, sdo_1c13[0]);
+  wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x01, sdo_1c12[1]);
+  wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x01, sdo_1c13[1]);
 
   // Sync Managers
-  uint16 sdo_1c32[] = { 0x0020, 0x0002 };
-  uint16 sdo_1c33[] = { 0x0020, 0x0002 };
-  wkc += writeSDO<uint16>(slave, SYNC_MANAGER_OUTPUT_PARAMETER_IDX, 0x00, sdo_1c32);
-  wkc += writeSDO<uint16>(slave, SYNC_MANAGER_INPUT_PARAMETER_IDX, 0x00, sdo_1c33);
+  uint16 sdo_1c32[] = { 0x20, 0x02 };
+  uint16 sdo_1c33[] = { 0x20, 0x02 };
+  wkc += writeSDO<uint16>(slave_idx, 0x1c32, 0x01, sdo_1c32[1]);
+  wkc += writeSDO<uint16>(slave_idx, 0x1c33, 0x01, sdo_1c33[1]);
 
   return wkc;
 }
@@ -39,15 +41,11 @@ inline int slave_setup(uint16 slave)
 class Master {
 private:
   const static size_t MAX_IO_MAP_SIZE = 4096;
+  int ec_state = EC_STATE_NONE;
+  uint8 io_map[MAX_IO_MAP_SIZE];
 
   std::string ifname;
   std::vector<std::string> slaves;
-
-  int wkc = 0;
-  int ec_state = EC_STATE_NONE;
-
-  uint8 io_map[MAX_IO_MAP_SIZE];
-
 
   bool network_configuration()
   {
@@ -70,7 +68,7 @@ private:
     uint16 L = ec_slave[slave_idx].SM[sm].SMlength;
     uint32 F = ec_slave[slave_idx].SM[sm].SMflags;
     uint8 Type = ec_slave[slave_idx].SMtype[sm];
-    printf("SM%d A:%4.4x L:%4d F:%8.8x Type:%d", sm, A, L, F, Type);
+    printf("SM%d A:%4.4x L:%4d F:%8.8x Type:%d\n", sm, A, L, F, Type);
   }
 
 
@@ -84,11 +82,11 @@ private:
     uint8 Psb = ec_slave[slave_idx].FMMU[fmmu].PhysStartBit;
     uint8 Ty = ec_slave[slave_idx].FMMU[fmmu].FMMUtype;
     uint8 Act = ec_slave[slave_idx].FMMU[fmmu].FMMUactive;
-    printf("FMMU%d Ls:%.8x Ll:%4.2d Lsb:%d Leb:%d Ps:%.4x Psb:%d Ty:%.2d Act:%.2d", fmmu, Ls, Ll, Lsb, Leb, Ps, Psb, Ty, Act);
+    printf("FMMU%d Ls:%.8x Ll:%4.2d Lsb:%d Leb:%d Ps:%.4x Psb:%d Ty:%.2d Act:%.2d\n", fmmu, Ls, Ll, Lsb, Leb, Ps, Psb, Ty, Act);
   }
 
 public:
-
+  int wkc = 0;
   delta::asda::ethercat::pdo::RxPDO2 rx_pdo[10];
   delta::asda::ethercat::pdo::TxPDO2 tx_pdo[10];
 
@@ -102,21 +100,21 @@ public:
   {
     if (ec_init(ifname.c_str()) > 0)
     {
-      printf("EtherCAT socket on: %s", ifname.c_str());
+      printf("EtherCAT socket on: %s\n", ifname.c_str());
     }
     else
     {
-      printf("Coludn't initialize EtherCAT Master socket on: %s", ifname.c_str());
+      printf("Coludn't initialize EtherCAT Master socket on: %s\n", ifname.c_str());
       return false;
     }
 
     if (ec_config_init(FALSE) > 0)
     {
-      printf("Slaves found and configured: %d", ec_slavecount);
+      printf("Slaves found and configured: %d\n", ec_slavecount);
     }
     else
     {
-      printf("Coludn't find and configure any slave.");
+      printf("Coludn't find and configure any slave.\n");
       return false;
     }
 
@@ -126,7 +124,7 @@ public:
     // Network Configuration
     if (!network_configuration())
     {
-      printf("Mismatch of network units!");
+      printf("Mismatch of network units!\n");
       return false;
     }
 
@@ -135,7 +133,7 @@ public:
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      ec_dcsync0(slave_idx, TRUE, 4000000U, 0);
+      ec_dcsync0(slave_idx, TRUE, 2000000U, 0);
     }
 
     // Pre-Operational -> Safe-Operational
@@ -148,10 +146,10 @@ public:
     int used_mem = ec_config_map(&io_map);
     if (used_mem > sizeof(io_map))
     {
-      printf("IO Map size: %d > MAX_IO_MAP_SIZE: %lu", used_mem, sizeof(io_map));
+      printf("IO Map size: %d > MAX_IO_MAP_SIZE: %lu\n", used_mem, sizeof(io_map));
       return false;
     }
-    printf("io_map size: %d", used_mem);
+    printf("IO Map size: %d\n", used_mem);
 
     // print slaves configuration
     for (int i = 0; i < ec_slavecount; i++)
@@ -165,33 +163,49 @@ public:
       print_fmmu(slave_idx, 1);   // FMUU1
     }
 
+    // SAFE OPERATIONAL
     ec_state = ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE);
+    print_ec_state(0);
 
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      print_ec_state(slave_idx);
+      fault_reset(slave_idx);
     }
 
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      init_slave(slave_idx);
+      set_mode_of_operation(slave_idx, mode_of_operation_t::CYCLIC_SYNCHRONOUS_POSITION);
+      set_interpolation_time_period(slave_idx, 2);
     }
 
     return true;
   }
 
 
-  int init_slave(uint16 slave_idx)
+  int fault_reset(uint16 slave_idx)
   {
-    uint16 control_word = 0x0006;
+    uint16 control_word = 0x0086;
     wkc += writeSDO<uint16>(slave_idx, CONTROL_WORD_IDX, 0x00, control_word);
+    printf("wkc: %d\tcontrol_word: 0x%.4X\n", wkc, control_word);
+    return wkc;
+  }
 
-    // uint16 status_word;
-    // wkc += readSDO<uint16>(slave_idx, STATUS_WORD_IDX, 0x00, status_word);
-    // ROS_DEBUG("WKC: %d\tSlave[%u] SDO 0x%.4X Status Word: 0x%.4x", wkc, slave_idx, STATUS_WORD_IDX, status_word);
 
+  int set_mode_of_operation(uint16 slave_idx, mode_of_operation_t mode_of_operation)
+  {
+    wkc += writeSDO<int8>(slave_idx, MODE_OF_OPERATION_IDX, 0x00, mode_of_operation);
+    printf("wkc: %d\tmode_of_operation: %d\n", wkc, mode_of_operation);
+    return wkc;
+  }
+
+
+  int set_interpolation_time_period(uint16 slave_idx, int8 interpolation_time_units, int8 interpolation_time_index = -3)
+  {
+    wkc += writeSDO<int8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x01, interpolation_time_units);
+    wkc += writeSDO<int8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x02, interpolation_time_index);
+    printf("wkc: %d\tinterpolation_time_period: %d\n", wkc, interpolation_time_units);
     return wkc;
   }
 
@@ -267,6 +281,8 @@ public:
       ec_writestate(slave_idx);
     }
 
+    ec_state = ec_statecheck(0, EC_STATE_OPERATIONAL, EC_TIMEOUTSTATE);
+    print_ec_state(0);
     return true;
   }
 
@@ -421,9 +437,9 @@ public:
   }
 
 
-  int get_error_code(const uint16 slave_idx, uint8 &error_code)
+  int get_error_code(const uint16 slave_idx, uint16 &error_code)
   {
-    wkc += readSDO<uint8>(slave_idx, ERROR_CODE_IDX, 0x00, error_code);
+    wkc += readSDO<uint16>(slave_idx, ERROR_CODE_IDX, 0x00, error_code);
     return wkc;
   }
 

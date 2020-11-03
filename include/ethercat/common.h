@@ -115,7 +115,7 @@ static std::map<uint32, std::string> error_codes
 
 
 template<class T>
-int writeSDO(const uint16 slave, const uint16 index, const uint8 sub_index, const T value)
+int writeSDO(const uint16 slave, const uint16 index, const uint8 sub_index, T value)
 {
   int wkc = 0;
 
@@ -171,34 +171,34 @@ inline void print_ec_state(uint16 slave_idx)
   switch (ec_slave[slave_idx].state)
   {
     case EC_STATE_NONE:
-      printf("%s: EC_STATE: %s", ec_slave[slave_idx].name, "NONE");
+      printf("%s: EC_STATE: %s\n", ec_slave[slave_idx].name, "NONE");
       break;
     case EC_STATE_INIT:
-      printf("%s: EC_STATE: %s", ec_slave[slave_idx].name, "INIT");
+      printf("%s: EC_STATE: %s\n", ec_slave[slave_idx].name, "INIT");
       break;
     case EC_STATE_PRE_OP:
-      printf("%s: EC_STATE: %s", ec_slave[slave_idx].name, "PRE_OP");
+      printf("%s: EC_STATE: %s\n", ec_slave[slave_idx].name, "PRE_OP");
       break;
     case EC_STATE_BOOT:
-      printf("%s: EC_STATE: %s", ec_slave[slave_idx].name, "BOOT");
+      printf("%s: EC_STATE: %s\n", ec_slave[slave_idx].name, "BOOT");
       break;
     case EC_STATE_SAFE_OP:
-      printf("%s: EC_STATE: %s", ec_slave[slave_idx].name, "SAFE_OP");
+      printf("%s: EC_STATE: %s\n", ec_slave[slave_idx].name, "SAFE_OP");
       break;
     case EC_STATE_OPERATIONAL:
-      printf("%s: EC_STATE: %s", ec_slave[slave_idx].name, "OPERATIONAL");
+      printf("%s: EC_STATE: %s\n", ec_slave[slave_idx].name, "OPERATIONAL");
       break;
     //case EC_STATE_ACK:
     //  ROS_INFO("%s: ESM: %s", ec_slave[slave].name, "EC_STATE_ACK");
     //  break;
     case EC_STATE_PRE_OP + EC_STATE_ERROR:
-      printf("%s: EC_STATE: %s + %s", ec_slave[slave_idx].name, "PRE_OP", "ERROR");
+      printf("%s: EC_STATE: %s + %s\n", ec_slave[slave_idx].name, "PRE_OP", "ERROR");
       break;
     case EC_STATE_SAFE_OP + EC_STATE_ERROR:
-      printf("%s: EC_STATE: %s + %s", ec_slave[slave_idx].name, "SAFE_OP", "ERROR");
+      printf("%s: EC_STATE: %s + %s\n", ec_slave[slave_idx].name, "SAFE_OP", "ERROR");
       break;
     case EC_STATE_OPERATIONAL + EC_STATE_ERROR:
-      printf("%s: EC_STATE: %s + %s", ec_slave[slave_idx].name, "OPERATIONAL", "ERROR");
+      printf("%s: EC_STATE: %s + %s\n", ec_slave[slave_idx].name, "OPERATIONAL", "ERROR");
       break;
   }
 }

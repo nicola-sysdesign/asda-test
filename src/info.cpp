@@ -15,6 +15,7 @@
 // soem
 #include "ethercat.h"
 
+#include "ethercat/common.h"
 #include "ethercat/master.h"
 
 #define POSITION_STEP_FACTOR  1280000
@@ -73,14 +74,64 @@ int main(int argc, char* argv[])
 
 
   auto t0 = std::chrono::steady_clock::now();
-  for (int iter = 0; iter < 2000; iter++)
+  for (int iter = 1; iter < 200; iter++)
   {
-    std::this_thread::sleep_until(t0 + iter * std::chrono::microseconds(4000));
+    std::this_thread::sleep_until(t0 + iter * std::chrono::microseconds(2000));
     auto t = std::chrono::steady_clock::now();
 
+    // read
+    for (int i = 0; i < ec_slavecount; i++)
+    {
+      const uint16 slave_idx = 1 + i;
+      uint16 status_word = ec_master.tx_pdo[slave_idx].status_word;
+      int32 actual_position = ec_master.tx_pdo[slave_idx].actual_position;
 
+      a_pos[i] = actual_position;
+
+      printf("wkc: %d\tstatus_word: 0x%.4X\n", ec_master.wkc, status_word);
+      printf("wkc: %d\tactual_position: %d\n", ec_master.wkc, actual_position);
+
+      uint16 error_code;
+      ec_master.wkc += delta::asda::ethercat::readSDO<uint16>(slave_idx, ERROR_CODE_IDX, 0x00, error_code);
+      printf("wkc: %d\terror_code: 0x%.4X\n", ec_master.wkc, error_code);
+
+      int8 mode_of_operation_display;
+      ec_master.wkc += delta::asda::ethercat::readSDO<int8>(slave_idx, MODE_OF_OPERATION_DISPLAY_IDX, 0x00, mode_of_operation_display);
+      printf("wkc: %d\tmode_of_operation_display: %d\n", ec_master.wkc, mode_of_operation_display);
+    }
 
     ec_master.update();
+
+    // write
+    if (iter == 1)
+    {
+      for (int i = 0; i < ec_slavecount; i++)
+      {
+        const uint16 slave_idx = 1 + i;
+        ec_master.rx_pdo[slave_idx].control_word = 0x0006;
+        ec_master.rx_pdo[slave_idx].target_position = a_pos_cmd[i];
+      }
+    }
+
+    if (iter == 10)
+    {
+      for (int i = 0; i < ec_slavecount; i++)
+      {
+        const uint16 slave_idx = 1 + i;
+        ec_master.rx_pdo[slave_idx].control_word = 0x0007;
+        ec_master.rx_pdo[slave_idx].target_position = a_pos_cmd[i];
+      }
+    }
+
+    if (iter > 50)
+    {
+      for (int i = 0; i < ec_slavecount; i++)
+      {
+        const uint16 slave_idx = 1 + i;
+        ec_master.rx_pdo[slave_idx].control_word = 0x000F;
+        ec_master.rx_pdo[slave_idx].target_position = a_pos_cmd[i];
+      }
+    }
   }
 
   ec_master.close();
