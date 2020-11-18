@@ -20,7 +20,7 @@ inline int slave_setup(uint16 slave_idx)
 {
   int wkc = 0;
 
-  // PDO Mapping
+  // Sync Managers mapping
   uint16 sdo_1c12[] = { 0x01, 0x1601 };
   uint16 sdo_1c13[] = { 0x01, 0x1A01 };
   wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x00, sdo_1c12[0]);
@@ -28,7 +28,7 @@ inline int slave_setup(uint16 slave_idx)
   wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x01, sdo_1c12[1]);
   wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x01, sdo_1c13[1]);
 
-  // Sync Managers
+  // Sync Managers synchronization
   uint16 sdo_1c32[] = { 0x20, 0x02 };
   uint16 sdo_1c33[] = { 0x20, 0x02 };
   wkc += writeSDO<uint16>(slave_idx, 0x1c32, 0x01, sdo_1c32[1]);
@@ -40,49 +40,26 @@ inline int slave_setup(uint16 slave_idx)
 
 class Master {
 private:
-  const static size_t MAX_IO_MAP_SIZE = 4096;
   int ec_state = EC_STATE_NONE;
+
+  const static size_t MAX_IO_MAP_SIZE = 4096;
   uint8 io_map[MAX_IO_MAP_SIZE];
 
   std::string ifname;
   std::vector<std::string> slaves;
+
 
   bool network_configuration()
   {
     for (int i = 0; i < slaves.size(); i++)
     {
       const uint16 slave_idx = 1 + i;
-
       if (strcmp(ec_slave[slave_idx].name, slaves[i].c_str()))
       {
         return false;
       }
     }
     return true;
-  }
-
-
-  void print_sm(uint16 slave_idx, int sm)
-  {
-    uint16 A = ec_slave[slave_idx].SM[sm].StartAddr;
-    uint16 L = ec_slave[slave_idx].SM[sm].SMlength;
-    uint32 F = ec_slave[slave_idx].SM[sm].SMflags;
-    uint8 Type = ec_slave[slave_idx].SMtype[sm];
-    printf("SM%d A:%4.4x L:%4d F:%8.8x Type:%d\n", sm, A, L, F, Type);
-  }
-
-
-  void print_fmmu(uint16 slave_idx, int fmmu)
-  {
-    uint32 Ls = ec_slave[slave_idx].FMMU[fmmu].LogStart;
-    uint16 Ll = ec_slave[slave_idx].FMMU[fmmu].LogLength;
-    uint8 Lsb = ec_slave[slave_idx].FMMU[fmmu].LogStartbit;
-    uint8 Leb = ec_slave[slave_idx].FMMU[fmmu].LogEndbit;
-    uint16 Ps = ec_slave[slave_idx].FMMU[fmmu].PhysStart;
-    uint8 Psb = ec_slave[slave_idx].FMMU[fmmu].PhysStartBit;
-    uint8 Ty = ec_slave[slave_idx].FMMU[fmmu].FMMUtype;
-    uint8 Act = ec_slave[slave_idx].FMMU[fmmu].FMMUactive;
-    printf("FMMU%d Ls:%.8x Ll:%4.2d Lsb:%d Leb:%d Ps:%.4x Psb:%d Ty:%.2d Act:%.2d\n", fmmu, Ls, Ll, Lsb, Leb, Ps, Psb, Ty, Act);
   }
 
 public:
@@ -177,7 +154,7 @@ public:
     {
       const uint16 slave_idx = 1 + i;
       set_mode_of_operation(slave_idx, mode_of_operation_t::CYCLIC_SYNCHRONOUS_POSITION);
-      set_interpolation_time_period(slave_idx, 2);
+      config_position_interpolation(slave_idx, interpolation_sub_mode_t::LINEAR_INTERPOLATION, 2);
     }
 
     return true;
@@ -188,7 +165,6 @@ public:
   {
     uint16 control_word = 0x0086;
     wkc += writeSDO<uint16>(slave_idx, CONTROL_WORD_IDX, 0x00, control_word);
-    printf("wkc: %d\tcontrol_word: 0x%.4X\n", wkc, control_word);
     return wkc;
   }
 
@@ -196,23 +172,24 @@ public:
   int set_mode_of_operation(uint16 slave_idx, mode_of_operation_t mode_of_operation)
   {
     wkc += writeSDO<int8>(slave_idx, MODE_OF_OPERATION_IDX, 0x00, mode_of_operation);
-    printf("wkc: %d\tmode_of_operation: %d\n", wkc, mode_of_operation);
     return wkc;
   }
 
 
-  int set_interpolation_time_period(uint16 slave_idx, int8 interpolation_time_units, int8 interpolation_time_index = -3)
+  int config_position_interpolation(uint16 slave_idx, interpolation_sub_mode_t interpolation_sub_mode_select, uint8 interpolation_time_units, int8 interpolation_time_index = -3)
   {
-    wkc += writeSDO<int8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x01, interpolation_time_units);
+    wkc += writeSDO<int16>(slave_idx, INTERPOLATION_SUB_MODE_SELECT_IDX, 0x00, interpolation_sub_mode_select);
+    wkc += writeSDO<uint8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x01, interpolation_time_units);
     wkc += writeSDO<int8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x02, interpolation_time_index);
-    printf("wkc: %d\tinterpolation_time_period: %d\n", wkc, interpolation_time_units);
     return wkc;
   }
 
 
-  int config_following_error_window(uint16 slave_idx, uint32 following_error_window = 1000)
+  int config_following_error_window(uint16 slave_idx, uint32 following_error_window, uint32 position_window, uint16 position_window_time)
   {
     wkc += writeSDO<uint32>(slave_idx, FOLLOWING_ERROR_WINDOW_IDX, 0x00, following_error_window);
+    wkc += writeSDO<uint32>(slave_idx, POSITION_WINDOW_IDX, 0x00, position_window);
+    wkc += writeSDO<uint16>(slave_idx, POSITION_WINDOW_TIME_IDX, 0x00, position_window_time);
     return wkc;
   }
 
@@ -227,20 +204,32 @@ public:
   int config_homing(uint16 slave_idx, int8 homing_method = 0, uint32 homing_speed_to_switch = 0, uint32 homing_speed_to_zero = 0, uint32 homing_acceleration = 0, int32 home_offset = 0, uint8 home_switch = 0x08)
   {
     wkc += writeSDO<int8>(slave_idx, HOMING_METHOD_IDX, 0x00, homing_method);
-
-    // wkc += readSDO<int8>(slave_idx, HOMING_METHOD_IDX, 0x00, homing_method);
-    // ROS_DEBUG("WKC: %d\tSlave[%u] SDO 0x%.4X Homing Method: %d", wkc, slave_idx, HOMING_METHOD_IDX, homing_method);
-
-    wkc += writeSDO<uint32>(slave_idx, HOMING_SPEED_IDX, 0x01, homing_speed_to_switch);
-    wkc += writeSDO<uint32>(slave_idx, HOMING_SPEED_IDX, 0x02, homing_speed_to_zero);
+    wkc += writeSDO<uint32>(slave_idx, HOMING_SPEEDS_IDX, 0x01, homing_speed_to_switch);
+    wkc += writeSDO<uint32>(slave_idx, HOMING_SPEEDS_IDX, 0x02, homing_speed_to_zero);
     wkc += writeSDO<uint32>(slave_idx, HOMING_ACCELERATION_IDX, 0x00, homing_acceleration);
-
-    // wkc += readSDO<uint32>(slave_idx, HOMING_SPEED_IDX, 0x01, homing_speed_to_switch);
-    // wkc += readSDO<uint32>(slave_idx, HOMING_SPEED_IDX, 0x02, homing_speed_to_zero);
-    // ROS_DEBUG("WKC: %d\tSlave[%u] SDO 0x%.4X Homing Speed: %d %d", wkc, slave_idx, HOMING_SPEED_IDX, homing_speed_to_switch, homing_speed_to_zero);
-
     wkc += writeSDO<int32>(slave_idx, HOME_OFFSET_IDX, 0x00, home_offset);
+    return wkc;
+  }
 
+
+  int get_actual_position(uint16 slave_idx, int32 &actual_position)
+  {
+    wkc += readSDO<int32>(slave_idx, POSITION_ACTUAL_VALUE_IDX, 0x00, actual_position);
+    return wkc;
+  }
+
+
+  int set_position_offset(uint16 slave_idx, int32 position_offset)
+  {
+    wkc += writeSDO<int32>(slave_idx, POSITION_OFFSET_IDX, 0x00, position_offset);
+    return wkc;
+  }
+
+
+  int set_position_factor(uint16 slave_idx, uint32 numerator, uint32 feed_costant)
+  {
+    wkc += writeSDO<uint32>(slave_idx, POSITION_FACTOR_IDX, 0x01, numerator);
+    wkc += writeSDO<uint32>(slave_idx, POSITION_FACTOR_IDX, 0x02, feed_costant);
     return wkc;
   }
 
@@ -277,7 +266,7 @@ public:
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      ec_slave[slave_idx].state = EC_STATE_OPERATIONAL + EC_STATE_ACK;
+      ec_slave[slave_idx].state = EC_STATE_OPERATIONAL;
       ec_writestate(slave_idx);
     }
 
@@ -316,7 +305,7 @@ public:
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      rx_pdo[slave_idx].control_word = 0x000F;
+      rx_pdo[slave_idx].control_word = 0x0007;
     }
 
     return true;
@@ -329,6 +318,18 @@ public:
     {
       const uint16 slave_idx = 1 + i;
       rx_pdo[slave_idx].control_word &= 0xFFFE;
+    }
+
+    return true;
+  }
+
+
+  bool start_motion()
+  {
+    for (int i = 0; i < ec_slavecount; i++)
+    {
+      const uint16 slave_idx = 1 + i;
+      rx_pdo[slave_idx].control_word = 0x000F;
     }
 
     return true;

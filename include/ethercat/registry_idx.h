@@ -54,7 +54,7 @@
 #define TORQUE_SLOPE_IDX                            0x6087
 #define POSITION_FACTOR_IDX                         0x6093
 #define HOMING_METHOD_IDX                           0x6098
-#define HOMING_SPEED_IDX                            0x6099
+#define HOMING_SPEEDS_IDX                           0x6099
 #define HOMING_ACCELERATION_IDX                     0x609A
 #define POSITION_OFFSET_IDX                         0x60B0
 #define VELOCITY_OFFSET_IDX                         0x60B1

@@ -1,24 +1,20 @@
 // STL
 #include <cmath>
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <vector>
 #include <chrono>
 #include <thread>
-#include <ratio>
 //
 #include <pthread.h>
 #include <unistd.h>
-// soem
-#include "ethercat.h"
 // Boost
 #include <boost/program_options.hpp>
 
-#include "master.h"
+#include "ethercat/master.h"
 
-#define POSITION_STEP_FACTOR  1280000
-#define VELOCITY_STEP_FACTOR  1280000
+#define POSITION_STEP_FACTOR  100000
+#define VELOCITY_STEP_FACTOR  100000
 
 
 int main(int argc, char* argv[])
@@ -53,37 +49,55 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-
-  esa::ewdl::ethercat::Master ec_master(ifname, slaves);
+  // Init
+  delta::asda::ethercat::Master ec_master(ifname, slaves);
   if (!ec_master.init())
   {
-    return 0;
+    return 1;
   }
 
-  // pthread_t pthread;
-  // pthread_attr_t pthread_attr;
-  // pthread_create()
-
+  // Start
   const int n_slaves = slaves.size();
 
-  std::vector<int> a_pos;     a_pos.resize(n_slaves, 0);
-  std::vector<int> a_pos_cmd; a_pos_cmd.resize(n_slaves, 0);
+  std::vector<int> a_pos;     std::vector<int> a_pos_cmd;
+  std::vector<int> a_vel;     std::vector<int> a_vel_cmd;
+  std::vector<int> a_eff;     std::vector<int> a_eff_cmd;
+
+  a_pos.resize(n_slaves, 0);  a_pos_cmd.resize(n_slaves, 0);
+  a_vel.resize(n_slaves, 0);  a_vel_cmd.resize(n_slaves, 0);
+  a_eff.resize(n_slaves, 0);  a_eff_cmd.resize(n_slaves, 0);
+
+  for (int i = 0; i < n_slaves; i++)
+  {
+    const uint16 slave_idx = 1 + i;
+
+    int32 actual_position;
+    ec_master.get_actual_position(slave_idx, actual_position);
+    ec_master.set_position_offset(slave_idx, actual_position);
+
+    uint32 numerator = 128, feed_costant = 10;
+    ec_master.set_position_factor(slave_idx, numerator, feed_costant);
+  }
 
   if (!ec_master.start())
   {
-    return 0;
+    return 1;
   }
 
-
-  std::ofstream file("ewdl.log", std::ofstream::out);
-
+  // Loop
   auto t0 = std::chrono::steady_clock::now();
-  for (int iter = 0; iter < 2000; iter++)
+  auto t_1 = t0;
+  for (int iter = 1; iter < 20000; iter++)
   {
-    std::this_thread::sleep_until(t0 + iter * std::chrono::microseconds(4000));
+    std::this_thread::sleep_until(t0 + iter * std::chrono::milliseconds(2));
     auto t = std::chrono::steady_clock::now();
+    auto period = t - t_1;
+    if (period.count() < 1900000 || 2100000 < period.count())
+    {
+      printf("iter: %d period: %ld\n", iter, period.count() / 1000);
+    }
 
-    if (iter == 0)
+    if (iter == 1)
     {
       std::cout << "Fault Reset ... ";
       if (ec_master.fault_reset())
@@ -113,20 +127,6 @@ int main(int argc, char* argv[])
 
     if (iter == 200)
     {
-      std::cout << "Set Zero Position ... ";
-      if (ec_master.set_zero_position())
-      {
-        std::cout << "SUCCESS" << std::endl;
-      }
-      else
-      {
-        std::cout << "FAILURE" << std::endl;
-        return 0;
-      }
-    }
-
-    if (iter == 300)
-    {
       std::cout << "Switch On ... ";
       if (ec_master.switch_on())
       {
@@ -141,8 +141,8 @@ int main(int argc, char* argv[])
 
     if (iter == 400)
     {
-      std::cout << "Start Cyclic Synchronous Position Mode (CSP) ... ";
-      if (ec_master.start_cyclic_syncronous_position())
+      std::cout << "Enable Motion ... ";
+      if (ec_master.start_motion())
       {
         std::cout << "SUCCESS" << std::endl;
       }
@@ -153,32 +153,30 @@ int main(int argc, char* argv[])
       }
     }
 
+
     if (iter > 500)
     {
-      auto t_cmd = t - 500 * std::chrono::microseconds(4000) - t0;
+      auto t_cmd = t - 500 * std::chrono::milliseconds(2) - t0;
 
       for (int i = 0; i < n_slaves; i++)
       {
         const uint16 slave_idx = 1 + i;
 
         // read
-        a_pos[i] = ec_master.tx_pdo[slave_idx].position_actual_value;
+        uint16 status_word = ec_master.tx_pdo[slave_idx].status_word;
+        int32 actual_position = ec_master.tx_pdo[slave_idx].actual_position;
+
+        a_pos[i] = ec_master.tx_pdo[slave_idx].actual_position;
 
         // write
-        a_pos_cmd[i] = limit * std::sin(M_PI * t_cmd.count() / 1000000000.0);
+        a_pos_cmd[i] = 0.5 * limit * (1 - std::cos(M_PI * t_cmd.count() / 1000000000.0));
         ec_master.rx_pdo[slave_idx].target_position = a_pos_cmd[i];
-
-        char record[1024];
-        sprintf(record, "%ld\t%d\t%d", t_cmd.count(), a_pos[i], a_pos_cmd[i]);
-        file << record << std::endl;
       }
     }
 
     ec_master.update();
+    t_1 = t;
   }
-
-
-  file.close();
 
   ec_master.close();
   return 0;

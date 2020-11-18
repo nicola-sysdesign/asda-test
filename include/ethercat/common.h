@@ -25,6 +25,13 @@ enum mode_of_operation_t : int8
 // In DC synchronization mode, CSP, CSV and HM modes are supported.
 
 
+/* Interpolation Sub-Mode */
+enum interpolation_sub_mode_t : int16
+{
+  LINEAR_INTERPOLATION = 0,           // Linear Interpolation
+};
+
+
 /* Error Codes */
 // static std::map<uint16, std::string> error_codes
 // {
@@ -201,6 +208,30 @@ inline void print_ec_state(uint16 slave_idx)
       printf("%s: EC_STATE: %s + %s\n", ec_slave[slave_idx].name, "OPERATIONAL", "ERROR");
       break;
   }
+}
+
+
+inline void print_sm(uint16 slave_idx, int sm)
+{
+  uint16 A = ec_slave[slave_idx].SM[sm].StartAddr;
+  uint16 L = ec_slave[slave_idx].SM[sm].SMlength;
+  uint32 F = ec_slave[slave_idx].SM[sm].SMflags;
+  uint8 Type = ec_slave[slave_idx].SMtype[sm];
+  printf("SM%d A:%4.4x L:%4d F:%8.8x Type:%d\n", sm, A, L, F, Type);
+}
+
+
+inline void print_fmmu(uint16 slave_idx, int fmmu)
+{
+  uint32 Ls = ec_slave[slave_idx].FMMU[fmmu].LogStart;
+  uint16 Ll = ec_slave[slave_idx].FMMU[fmmu].LogLength;
+  uint8 Lsb = ec_slave[slave_idx].FMMU[fmmu].LogStartbit;
+  uint8 Leb = ec_slave[slave_idx].FMMU[fmmu].LogEndbit;
+  uint16 Ps = ec_slave[slave_idx].FMMU[fmmu].PhysStart;
+  uint8 Psb = ec_slave[slave_idx].FMMU[fmmu].PhysStartBit;
+  uint8 Ty = ec_slave[slave_idx].FMMU[fmmu].FMMUtype;
+  uint8 Act = ec_slave[slave_idx].FMMU[fmmu].FMMUactive;
+  printf("FMMU%d Ls:%.8x Ll:%4.2d Lsb:%d Leb:%d Ps:%.4x Psb:%d Ty:%.2d Act:%.2d\n", fmmu, Ls, Ll, Lsb, Leb, Ps, Psb, Ty, Act);
 }
 
 

@@ -20,7 +20,9 @@ include_directories(
 )
 
 add_executable(info src/info.cpp)
-target_link_libraries(info soem ${Boost_LIBRARIES})
+add_executable(run src/run.cpp)
 
+target_link_libraries(info soem ${Boost_LIBRARIES})
+target_link_libraries(run soem ${Boost_LIBRARIES})
 
 message(STATUS ${CMAKE_MODULE_PATH})
