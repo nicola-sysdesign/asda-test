@@ -1,11 +1,10 @@
 #ifndef DELTA_ASDA_ETHERCAT_MASTER_H
-#define DALTA_ASDA_ETHERCAT_MASTER_H
-// STL
+#define DELTA_ASDA_ETHERCAT_MASTER_H
 #include <string>
 #include <vector>
 // Boost
 #include <boost/variant.hpp>
-// soem
+// SOEM
 #include "ethercat.h"
 //
 #include "ethercat/common.h"
@@ -401,8 +400,8 @@ public:
       rx_pdo[slave_idx] >> ec_slave[slave_idx].outputs;
     }
 
-    ec_send_processdata();
-    wkc += ec_receive_processdata(EC_TIMEOUTRET3);
+    // ec_send_processdata();
+    // wkc += ec_receive_processdata(EC_TIMEOUTRET);
 
     for (int i = 0; i < ec_slavecount; i++)
     {

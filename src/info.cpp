@@ -1,11 +1,10 @@
-// STL
 #include <cmath>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <chrono>
 #include <thread>
-//
+// Unix
 #include <pthread.h>
 #include <unistd.h>
 // Boost

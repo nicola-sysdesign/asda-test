@@ -101,7 +101,7 @@ void* control_loop(void* arg)
         uint16 status_word = ec_master->tx_pdo[slave_idx].status_word;
         int32 actual_position = ec_master->tx_pdo[slave_idx].actual_position;
 
-        int32 target_position = 0.5 * POSITION_STEP_FACTOR * (1 - std::cos(M_PI * t_cmd.count() / 1000000000.0));
+        int32 target_position = 0;
         ec_master->rx_pdo[slave_idx].target_position = target_position;
       }
     }
@@ -109,6 +109,8 @@ void* control_loop(void* arg)
     ec_master->update();
     t_1 = t;
   }
+
+  std::cout << "Finished." << std::endl;
 }
 
 
@@ -202,7 +204,7 @@ int main(int argc, char* argv[])
   errno = pthread_attr_setinheritsched(&pthread_attr, PTHREAD_EXPLICIT_SCHED);
   if (errno != 0)
   {
-    perror("pthread_attr_setschedpolicy");
+    perror("%d, pthread_attr_setschedpolicy");
     return 1;
   }
 
