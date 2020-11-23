@@ -28,6 +28,7 @@ void* control_loop(void* arg)
   {
     std::this_thread::sleep_until(t0 + iter * std::chrono::milliseconds(2));
     auto t = std::chrono::steady_clock::now();
+
     auto period = t - t_1;
     if (period.count() < 1900000 || 2100000 < period.count())
     {

@@ -129,6 +129,7 @@ struct RxPDO4
 {
   uint16 control_word;
   int32 interpolated_position_command;
+  int16 interpolated_position_difference;
 
   void operator>>(uint8 *data_ptr)
   {
@@ -140,10 +141,10 @@ struct RxPDO4
     *data_ptr++ = (interpolated_position_command >> 16) & 0xFF;
     *data_ptr++ = (interpolated_position_command >> 24) & 0xFF;
 
-    // *data_ptr++ = (target_torque >> 0) & 0xFF;
-    // *data_ptr++ = (target_torque >> 8) & 0xFF;
-    // *data_ptr++ = (target_torque >> 16) & 0xFF;
-    // *data_ptr++ = (target_torque >> 24) & 0xFF;
+    *data_ptr++ = (interpolated_position_difference >> 0) & 0xFF;
+    *data_ptr++ = (interpolated_position_difference >> 8) & 0xFF;
+    *data_ptr++ = (interpolated_position_difference >> 16) & 0xFF;
+    *data_ptr++ = (interpolated_position_difference >> 24) & 0xFF;
   }
 
   // std::stream operator <<(std::stream &os, const T &obj)

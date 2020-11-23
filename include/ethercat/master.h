@@ -31,13 +31,15 @@ inline int slave_setup(uint16 slave_idx)
   // PDO mapping
   uint32 sdo_1603[] =
   {
-    0x02,
+    0x03,
     0x60400010,
     0x60C10120,
+    0x60C10210,
   };
   wkc += writeSDO<uint8>(slave_idx, 0x1603, 0x00, sdo_1603[0]);
   wkc += writeSDO<uint32>(slave_idx, 0x1603, 0x01, sdo_1603[1]);
   wkc += writeSDO<uint32>(slave_idx, 0x1603, 0x02, sdo_1603[2]);
+  wkc += writeSDO<uint32>(slave_idx, 0x1603, 0x03, sdo_1603[3]);
   uint32 sdo_1A03[] =
   {
     0x02,
@@ -96,6 +98,56 @@ private:
     return true;
   }
 
+
+  // void ec_sync(uint64 dc_time, int64 dc_cycle , int64 *t_off)
+  // {
+  //   uint32 curr_dc_time = (uint32)(ec_DCtime & 0xffffffff);
+  //
+  //   if (curr_dc_time > prev_dc_time)
+  //   {
+  //     diff_dc_time = curr_dc_time - prev_dc_time
+  //   }
+  //   else
+  //   {
+  //     diff_dc_time = (0xffffffff - prev_dc_time) + curr_dc_time
+  //   }
+  //
+  //   prev_dc_time = curr_dc_time;
+  //
+  //   cur_DCtime += diff_dc_time;
+  //   t_off = pi_sync();
+  //
+  //   if (cur_DCtime > max_DCtime)
+  //   {
+  //     max_DCtime = curr_DCtime;
+  //   }
+  // }
+
+  const uint64 PI_SAT_VAL = 1000000U;
+
+  double Vp = 0, Vi = 0;
+  double Kp = 0.1, Ki = 0.0005;
+
+  uint64 pi_sync(uint64 ref_time, uint64 cycle_time, int32 shift_time)
+  {
+    uint64 adj_time = 0;
+    uint64 sync_err = (ref_time - shift_time) % cycle_time;
+    if (sync_err > (cycle_time / 2))
+    {
+      sync_err = sync_err - cycle_time;
+    }
+
+    Vp = Kp * sync_err;
+    Vi += Ki * sync_err;
+
+    adj_time = -Vp - Vi;
+
+    if (adj_time > PI_SAT_VAL) adj_time = PI_SAT_VAL;
+    if (adj_time < -PI_SAT_VAL) adj_time = -PI_SAT_VAL;
+
+    return adj_time;
+  }
+
 public:
   int wkc = 0;
   delta::asda::ethercat::pdo::RxPDO4 rx_pdo[10];
@@ -144,7 +196,7 @@ public:
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      ec_dcsync0(slave_idx, TRUE, 8000000U, 0);
+      ec_dcsync0(slave_idx, TRUE, 2000000U, 0);
     }
 
     // Pre-Operational -> Safe-Operational
@@ -188,7 +240,7 @@ public:
     {
       const uint16 slave_idx = 1 + i;
       set_mode_of_operation(slave_idx, mode_of_operation_t::INTERPOLATED_POSITION);
-      config_position_interpolation(slave_idx, interpolation_sub_mode_t::LINEAR_INTERPOLATION, 8);
+      config_position_interpolation(slave_idx, interpolation_sub_mode_t::LINEAR_INTERPOLATION, 2);
     }
 
     return true;
@@ -210,6 +262,15 @@ public:
   }
 
 
+  int config_profile(uint16 slave_idx, uint32 profile_velocity, uint32 profile_acceleration, uint32 profile_deceleration)
+  {
+    wkc += writeSDO(slave_idx, PROFILE_VELOCITY_IDX, 0x00, profile_velocity);
+    wkc += writeSDO(slave_idx, PROFILE_ACCELERATION_IDX, 0x00, profile_acceleration);
+    wkc += writeSDO(slave_idx, PROFILE_DECELERATION_IDX, 0x00, profile_deceleration);
+    return wkc;
+  }
+
+
   int config_position_interpolation(uint16 slave_idx, interpolation_sub_mode_t interpolation_sub_mode_select, uint8 interpolation_time_units, int8 interpolation_time_index = -3)
   {
     wkc += writeSDO<int16>(slave_idx, INTERPOLATION_SUB_MODE_SELECT_IDX, 0x00, interpolation_sub_mode_select);
@@ -219,23 +280,29 @@ public:
   }
 
 
-  int config_following_error_window(uint16 slave_idx, uint32 following_error_window, uint32 position_window, uint16 position_window_time)
+  int set_following_error_window(uint16 slave_idx, uint32 following_error_window)
   {
     wkc += writeSDO<uint32>(slave_idx, FOLLOWING_ERROR_WINDOW_IDX, 0x00, following_error_window);
+    return wkc;
+  }
+
+
+  int set_position_window(uint16 slave_idx, uint32 position_window, uint16 position_window_time)
+  {
     wkc += writeSDO<uint32>(slave_idx, POSITION_WINDOW_IDX, 0x00, position_window);
     wkc += writeSDO<uint16>(slave_idx, POSITION_WINDOW_TIME_IDX, 0x00, position_window_time);
     return wkc;
   }
 
 
-  int config_quickstop(uint16 slave_idx, uint32 quickstop_deceleration)
+  int set_quickstop_deceleration(uint16 slave_idx, uint32 quickstop_deceleration)
   {
     wkc += writeSDO<uint32>(slave_idx, QUICKSTOP_DECELERATION_IDX, 0x00, quickstop_deceleration);
     return wkc;
   }
 
 
-  int config_homing(uint16 slave_idx, int8 homing_method = 0, uint32 homing_speed_to_switch = 0, uint32 homing_speed_to_zero = 0, uint32 homing_acceleration = 0, int32 home_offset = 0, uint8 home_switch = 0x08)
+  int config_homing(uint16 slave_idx, int8 homing_method, uint32 homing_speed_to_switch, uint32 homing_speed_to_zero, uint32 homing_acceleration, int32 home_offset)
   {
     wkc += writeSDO<int8>(slave_idx, HOMING_METHOD_IDX, 0x00, homing_method);
     wkc += writeSDO<uint32>(slave_idx, HOMING_SPEEDS_IDX, 0x01, homing_speed_to_switch);
@@ -264,24 +331,6 @@ public:
   {
     wkc += writeSDO<uint32>(slave_idx, POSITION_FACTOR_IDX, 0x01, numerator);
     wkc += writeSDO<uint32>(slave_idx, POSITION_FACTOR_IDX, 0x02, feed_costant);
-    return wkc;
-  }
-
-
-  int init_profile(uint16 slave_idx)
-  {
-    int32 target_position = 0;
-    wkc += writeSDO(slave_idx, TARGET_POSITION_IDX, 0x00, target_position);
-
-    uint32 profile_velocity = 200000;
-    wkc += writeSDO(slave_idx, PROFILE_VELOCITY_IDX, 0x00, profile_velocity);
-
-    uint32 profile_acceleration = 200000;
-    wkc += writeSDO(slave_idx, PROFILE_ACCELERATION_IDX, 0x00, profile_acceleration);
-
-    uint32 profile_deceleration = 200000;
-    wkc += writeSDO(slave_idx, PROFILE_DECELERATION_IDX, 0x00, profile_deceleration);
-
     return wkc;
   }
 
@@ -472,27 +521,6 @@ public:
     //
     // ec_sync(dc_time, 2000000U, &t_off);
     return wkc;
-  }
-
-
-  void ec_sync(uint64 dc_time, int64 dc_cycle , int64 *t_off)
-  {
-    static int64 integral = 0;
-    int64 delta = (dc_time - 1000000U) % dc_cycle;
-
-    if (delta > (dc_cycle / 2))
-    {
-      delta = delta - dc_cycle;
-    }
-    if (delta > 0)
-    {
-      integral++;
-    }
-    if (delta < 0)
-    {
-      integral--;
-    }
-    *t_off = -(delta / 100) - (integral / 20);
   }
 
 
