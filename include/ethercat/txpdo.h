@@ -145,13 +145,13 @@ struct TxPDO4
 {
   uint16 status_word;
   int32 actual_position;
-  int32 actual_torque;
+  // int32 actual_torque;
 
   void operator<<(uint8 *data_ptr)
   {
     status_word = 0x0000;
     actual_position = 0x00000000;
-    actual_torque = 0x00000000;
+    // actual_torque = 0x00000000;
 
     status_word |= (0x00FF & *data_ptr++) << 0;
     status_word |= (0x00FF & *data_ptr++) << 8;
@@ -161,10 +161,10 @@ struct TxPDO4
     actual_position |= (0x000000FF & *data_ptr++) << 16;
     actual_position |= (0x000000FF & *data_ptr++) << 24;
 
-    actual_torque |= (0x000000FF & *data_ptr++) << 0;
-    actual_torque |= (0x000000FF & *data_ptr++) << 8;
-    actual_torque |= (0x000000FF & *data_ptr++) << 16;
-    actual_torque |= (0x000000FF & *data_ptr++) << 24;
+    // actual_torque |= (0x000000FF & *data_ptr++) << 0;
+    // actual_torque |= (0x000000FF & *data_ptr++) << 8;
+    // actual_torque |= (0x000000FF & *data_ptr++) << 16;
+    // actual_torque |= (0x000000FF & *data_ptr++) << 24;
   }
 
   // std::stream operator <<(std::stream &os, const T &obj) {

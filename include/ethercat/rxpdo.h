@@ -128,17 +128,22 @@ struct RxPDO3
 struct RxPDO4
 {
   uint16 control_word;
-  int32 target_torque;
+  int32 interpolated_position_command;
 
   void operator>>(uint8 *data_ptr)
   {
     *data_ptr++ = (control_word >> 0) & 0xFF;
     *data_ptr++ = (control_word >> 8) & 0xFF;
 
-    *data_ptr++ = (target_torque >> 0) & 0xFF;
-    *data_ptr++ = (target_torque >> 8) & 0xFF;
-    *data_ptr++ = (target_torque >> 16) & 0xFF;
-    *data_ptr++ = (target_torque >> 24) & 0xFF;
+    *data_ptr++ = (interpolated_position_command >> 0) & 0xFF;
+    *data_ptr++ = (interpolated_position_command >> 8) & 0xFF;
+    *data_ptr++ = (interpolated_position_command >> 16) & 0xFF;
+    *data_ptr++ = (interpolated_position_command >> 24) & 0xFF;
+
+    // *data_ptr++ = (target_torque >> 0) & 0xFF;
+    // *data_ptr++ = (target_torque >> 8) & 0xFF;
+    // *data_ptr++ = (target_torque >> 16) & 0xFF;
+    // *data_ptr++ = (target_torque >> 24) & 0xFF;
   }
 
   // std::stream operator <<(std::stream &os, const T &obj)

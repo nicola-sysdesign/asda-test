@@ -102,13 +102,15 @@ void* control_loop(void* arg)
         int32 actual_position = ec_master->tx_pdo[slave_idx].actual_position;
 
         int32 target_position = 0.5 * POSITION_STEP_FACTOR * (1 - std::cos(M_PI * t_cmd.count() / 1000000000.0));
-        ec_master->rx_pdo[slave_idx].target_position = target_position;
+        ec_master->rx_pdo[slave_idx].interpolated_position_command = target_position;
       }
     }
 
     ec_master->update();
     t_1 = t;
   }
+
+  std::cout << "Finished." << std::endl;
 }
 
 
@@ -166,10 +168,6 @@ int main(int argc, char* argv[])
   {
     const uint16 slave_idx = 1 + i;
 
-    int32 actual_position;
-    ec_master.get_actual_position(slave_idx, actual_position);
-    ec_master.set_position_offset(slave_idx, actual_position);
-
     uint32 numerator = 128, feed_costant = 10;
     ec_master.set_position_factor(slave_idx, numerator, feed_costant);
   }
@@ -191,7 +189,8 @@ int main(int argc, char* argv[])
   }
 
   cpu_set_t cpu_set;
-  CPU_ZERO(&cpu_set); CPU_SET(1, &cpu_set);
+  CPU_ZERO(&cpu_set);
+  CPU_SET(2, &cpu_set);
   errno = pthread_attr_setaffinity_np(&pthread_attr, sizeof(cpu_set), &cpu_set);
   if (errno != 0)
   {
@@ -215,7 +214,7 @@ int main(int argc, char* argv[])
 
   sched_param sched_param
   {
-    .sched_priority = 99
+    .sched_priority = 40
   };
   errno = pthread_attr_setschedparam(&pthread_attr, &sched_param);
   if (errno != 0)

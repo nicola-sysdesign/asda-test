@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
       a_pos[i] = actual_position;
       a_pos_cmd[i] = actual_position;
 
-      ec_master.rx_pdo[slave_idx].target_position = a_pos_cmd[i];
+      // ec_master.rx_pdo[slave_idx].target_position = a_pos_cmd[i];
     }
 
 

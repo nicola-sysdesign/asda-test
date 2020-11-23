@@ -24,9 +24,24 @@ void* control_loop(void* arg)
 
   auto t0 = std::chrono::steady_clock::now();
   auto t_1 = t0;
+
+  int t_off = 0;
   for (int iter = 1; iter < 1800000; iter++)
   {
-    std::this_thread::sleep_until(t0 + iter * std::chrono::milliseconds(2));
+    // auto t_dc = t0 + std::chrono::nanoseconds(ec_master->dc_time);
+    // printf("t_dc: %lu\n", std::chrono::nanoseconds(ec_master->dc_time).count());
+
+    // uint64 delta = ec_master->dc_time - ec_master->dc_time_1;
+    // if (delta < 2000000U)
+    // {
+    //   t_off += 100;
+    // }
+    // if (delta > 2000000U)
+    // {
+    //   t_off -= 100;
+    // }
+    // printf("t_off: %d\n", t_off);
+    std::this_thread::sleep_until(t0 + iter * std::chrono::milliseconds(2) + std::chrono::nanoseconds(t_off));
     auto t = std::chrono::steady_clock::now();
     auto period = t - t_1;
     if (period.count() < 1900000 || 2100000 < period.count())
@@ -102,7 +117,7 @@ void* control_loop(void* arg)
         int32 actual_position = ec_master->tx_pdo[slave_idx].actual_position;
 
         int32 target_position = 0;
-        ec_master->rx_pdo[slave_idx].target_position = target_position;
+        ec_master->rx_pdo[slave_idx].interpolated_position_command = target_position;
       }
     }
 
@@ -217,7 +232,7 @@ int main(int argc, char* argv[])
 
   sched_param sched_param
   {
-    .sched_priority = 99
+    .sched_priority = 80
   };
   errno = pthread_attr_setschedparam(&pthread_attr, &sched_param);
   if (errno != 0)

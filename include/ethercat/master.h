@@ -19,17 +19,52 @@ inline int slave_setup(uint16 slave_idx)
 {
   int wkc = 0;
 
+  {
+    uint16 sdo_1c12[] = { 0x00, 0x1603 };
+    uint16 sdo_1c13[] = { 0x00, 0x1A03 };
+    wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x00, sdo_1c12[0]);
+    wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x00, sdo_1c13[0]);
+    wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x01, sdo_1c12[1]);
+    wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x01, sdo_1c13[1]);
+  }
+
+  // PDO mapping
+  uint32 sdo_1603[] =
+  {
+    0x02,
+    0x60400010,
+    0x60C10120,
+  };
+  wkc += writeSDO<uint8>(slave_idx, 0x1603, 0x00, sdo_1603[0]);
+  wkc += writeSDO<uint32>(slave_idx, 0x1603, 0x01, sdo_1603[1]);
+  wkc += writeSDO<uint32>(slave_idx, 0x1603, 0x02, sdo_1603[2]);
+  uint32 sdo_1A03[] =
+  {
+    0x02,
+    0x60410010,
+    0x60640020,
+  };
+  wkc += writeSDO<uint8>(slave_idx, 0x1A03, 0x00, sdo_1A03[0]);
+  wkc += writeSDO<uint32>(slave_idx, 0x1A03, 0x01, sdo_1A03[1]);
+  wkc += writeSDO<uint32>(slave_idx, 0x1A03, 0x02, sdo_1A03[2]);
+
   // Sync Managers mapping
-  uint16 sdo_1c12[] = { 0x01, 0x1601 };
-  uint16 sdo_1c13[] = { 0x01, 0x1A01 };
-  wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x00, sdo_1c12[0]);
-  wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x00, sdo_1c13[0]);
-  wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x01, sdo_1c12[1]);
-  wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x01, sdo_1c13[1]);
+  {
+    // uint16 sdo_1c12[] = { 0x01, 0x1601 };
+    // uint16 sdo_1c13[] = { 0x01, 0x1A01 };
+    uint16 sdo_1c12[] = { 0x01, 0x1603 };
+    uint16 sdo_1c13[] = { 0x01, 0x1A03 };
+    wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x00, sdo_1c12[0]);
+    wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x00, sdo_1c13[0]);
+    wkc += writeSDO<uint16>(slave_idx, 0x1c12, 0x01, sdo_1c12[1]);
+    wkc += writeSDO<uint16>(slave_idx, 0x1c13, 0x01, sdo_1c13[1]);
+  }
 
   // Sync Managers synchronization
   uint16 sdo_1c32[] = { 0x20, 0x02 };
   uint16 sdo_1c33[] = { 0x20, 0x02 };
+  // uint16 sdo_1c32[] = { 0x20, 0x01 };
+  // uint16 sdo_1c33[] = { 0x20, 0x22 };
   wkc += writeSDO<uint16>(slave_idx, 0x1c32, 0x01, sdo_1c32[1]);
   wkc += writeSDO<uint16>(slave_idx, 0x1c33, 0x01, sdo_1c33[1]);
 
@@ -63,8 +98,8 @@ private:
 
 public:
   int wkc = 0;
-  delta::asda::ethercat::pdo::RxPDO2 rx_pdo[10];
-  delta::asda::ethercat::pdo::TxPDO2 tx_pdo[10];
+  delta::asda::ethercat::pdo::RxPDO4 rx_pdo[10];
+  delta::asda::ethercat::pdo::TxPDO4 tx_pdo[10];
 
   Master() { }
 
@@ -109,7 +144,7 @@ public:
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      ec_dcsync0(slave_idx, TRUE, 2000000U, 0);
+      ec_dcsync0(slave_idx, TRUE, 8000000U, 0);
     }
 
     // Pre-Operational -> Safe-Operational
@@ -152,8 +187,8 @@ public:
     for (int i = 0; i < ec_slavecount; i++)
     {
       const uint16 slave_idx = 1 + i;
-      set_mode_of_operation(slave_idx, mode_of_operation_t::CYCLIC_SYNCHRONOUS_POSITION);
-      config_position_interpolation(slave_idx, interpolation_sub_mode_t::LINEAR_INTERPOLATION, 2);
+      set_mode_of_operation(slave_idx, mode_of_operation_t::INTERPOLATED_POSITION);
+      config_position_interpolation(slave_idx, interpolation_sub_mode_t::LINEAR_INTERPOLATION, 8);
     }
 
     return true;
@@ -257,7 +292,7 @@ public:
     {
       const uint16 slave_idx = 1 + i;
       rx_pdo[slave_idx].control_word = 0x0006;
-      rx_pdo[slave_idx].target_position = 0;
+      rx_pdo[slave_idx].interpolated_position_command = 0;
     }
 
     update();
@@ -392,6 +427,12 @@ public:
   }
 
 
+  int ovf = 0;
+  uint64 dc_time;
+  uint64 dc_time_1;
+
+  int64 t_off = 0;
+
   int update()
   {
     for (int i = 0; i < ec_slavecount; i++)
@@ -400,8 +441,8 @@ public:
       rx_pdo[slave_idx] >> ec_slave[slave_idx].outputs;
     }
 
-    // ec_send_processdata();
-    // wkc += ec_receive_processdata(EC_TIMEOUTRET);
+    ec_send_processdata();
+    wkc += ec_receive_processdata(EC_TIMEOUTRET);
 
     for (int i = 0; i < ec_slavecount; i++)
     {
@@ -409,7 +450,49 @@ public:
       tx_pdo[slave_idx] << ec_slave[slave_idx].inputs;
     }
 
+    // int64 t_off;
+    // ec_sync(ec_DCtime, 2000000U, &t_off);
+    // printf("t_off: %ld\n", t_off);
+
+    // printf("ec_DCtime: %ld\n", ec_DCtime);
+
+    // int64 dc_delta = ec_DCtime % 2000000U;
+
+    // dc_time_1 = dc_time;
+    // if (ec_DCtime / 2000000U == 0)
+    // {
+    //   ovf++;
+    //   dc_time = ovf * std::pow(2, 32) + ec_DCtime;
+    // }
+    // else
+    // {
+    //   dc_time = ovf * std::pow(2, 32) + ec_DCtime;
+    // }
+    // printf("dc_time: %lu\n", dc_time);
+    //
+    // ec_sync(dc_time, 2000000U, &t_off);
     return wkc;
+  }
+
+
+  void ec_sync(uint64 dc_time, int64 dc_cycle , int64 *t_off)
+  {
+    static int64 integral = 0;
+    int64 delta = (dc_time - 1000000U) % dc_cycle;
+
+    if (delta > (dc_cycle / 2))
+    {
+      delta = delta - dc_cycle;
+    }
+    if (delta > 0)
+    {
+      integral++;
+    }
+    if (delta < 0)
+    {
+      integral--;
+    }
+    *t_off = -(delta / 100) - (integral / 20);
   }
 
 
