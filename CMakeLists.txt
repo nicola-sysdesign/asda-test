@@ -19,11 +19,11 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
 )
 
-add_executable(info src/info.cpp)
+# add_executable(info src/info.cpp)
 add_executable(idle src/idle.cpp)
 add_executable(run src/run.cpp)
 
-target_link_libraries(info soem ${Boost_LIBRARIES})
+# target_link_libraries(info soem ${Boost_LIBRARIES})
 target_link_libraries(idle soem ${Boost_LIBRARIES})
 target_link_libraries(run soem ${Boost_LIBRARIES})
 

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sched.h>
+#include <time.h>
 #include <errno.h>
 // Boost
 #include <boost/program_options.hpp>
@@ -17,25 +18,57 @@
 #define POSITION_STEP_FACTOR  100000
 #define VELOCITY_STEP_FACTOR  100000
 
+#define NSEC_PER_SEC  1000000000
+
+
+void add_timespec(struct timespec *ts, int64 addtime)
+{
+   int64 sec, nsec;
+
+   nsec = addtime % NSEC_PER_SEC;
+   sec = (addtime - nsec) / NSEC_PER_SEC;
+   ts->tv_sec += sec;
+   ts->tv_nsec += nsec;
+   if ( ts->tv_nsec >= NSEC_PER_SEC )
+   {
+      nsec = ts->tv_nsec % NSEC_PER_SEC;
+      ts->tv_sec += (ts->tv_nsec - nsec) / NSEC_PER_SEC;
+      ts->tv_nsec = nsec;
+   }
+}
+
+
+int64 diff_timespec(struct timespec *t1, struct timespec *t2)
+{
+  int64 t1_nsec = t1->tv_sec * NSEC_PER_SEC + t1->tv_nsec;
+  int64 t2_nsec = t2->tv_sec * NSEC_PER_SEC + t2->tv_nsec;
+
+  return t1_nsec - t2_nsec;
+}
+
 
 void* control_loop(void* arg)
 {
   delta::asda::ethercat::Master* ec_master = (delta::asda::ethercat::Master*)arg;
 
-  auto t0 = std::chrono::steady_clock::now();
-  auto t_1 = t0;
-  for (int iter = 1; iter < 1800000; iter++)
+  int64 cycletime = 2000000U;
+
+  struct timespec t, t_1;
+  clock_gettime(CLOCK_MONOTONIC, &t);
+
+  for (int iter = 0; iter < 1800000; iter++)
   {
-    std::this_thread::sleep_until(t0 + iter * std::chrono::milliseconds(2));
-    auto t = std::chrono::steady_clock::now();
+    add_timespec(&t, cycletime + ec_master->t_off);
 
-    auto period = t - t_1;
-    if (period.count() < 1900000 || 2100000 < period.count())
-    {
-      printf("iter: %d period: %ld\n", iter, period.count() / 1000);
-    }
+    struct timespec t_left;
+    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, &t_left);
 
-    if (iter == 1)
+    // if (diff_timespec < 1900000 || 2100000 < diff_timespec)
+    // {
+    //
+    // }
+
+    if (iter == 50)
     {
       std::cout << "Fault Reset ... ";
       if (ec_master->fault_reset())
@@ -93,7 +126,7 @@ void* control_loop(void* arg)
 
     if (iter > 500)
     {
-      auto t_cmd = t - 500 * std::chrono::milliseconds(2) - t0;
+      // auto t_cmd = t - 500 * std::chrono::milliseconds(2) - t0;
 
       for (int i = 0; i < ec_slavecount; i++)
       {
@@ -102,8 +135,8 @@ void* control_loop(void* arg)
         uint16 status_word = ec_master->tx_pdo[slave_idx].status_word;
         int32 actual_position = ec_master->tx_pdo[slave_idx].actual_position;
 
-        int32 target_position = 0.5 * POSITION_STEP_FACTOR * (1 - std::cos(M_PI * t_cmd.count() / 1000000000.0));
-        ec_master->rx_pdo[slave_idx].interpolated_position_command = target_position;
+        // int32 target_position = 0.5 * POSITION_STEP_FACTOR * (1 - std::cos(M_PI * t_cmd.count() / 1000000000.0));
+        // ec_master->rx_pdo[slave_idx].interpolated_position_command = target_position;
       }
     }
 

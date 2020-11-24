@@ -99,59 +99,75 @@ private:
   }
 
 
-  // void ec_sync(uint64 dc_time, int64 dc_cycle , int64 *t_off)
-  // {
-  //   uint32 curr_dc_time = (uint32)(ec_DCtime & 0xffffffff);
-  //
-  //   if (curr_dc_time > prev_dc_time)
-  //   {
-  //     diff_dc_time = curr_dc_time - prev_dc_time
-  //   }
-  //   else
-  //   {
-  //     diff_dc_time = (0xffffffff - prev_dc_time) + curr_dc_time
-  //   }
-  //
-  //   prev_dc_time = curr_dc_time;
-  //
-  //   cur_DCtime += diff_dc_time;
-  //   t_off = pi_sync();
-  //
-  //   if (cur_DCtime > max_DCtime)
-  //   {
-  //     max_DCtime = curr_DCtime;
-  //   }
-  // }
+  uint32 prev_DCtime;
+  uint32 curr_DCtime;
+  uint32 diff_DCtime;
 
-  const uint64 PI_SAT_VAL = 1000000U;
-
-  double Vp = 0, Vi = 0;
-  double Kp = 0.1, Ki = 0.0005;
-
-  uint64 pi_sync(uint64 ref_time, uint64 cycle_time, int32 shift_time)
+  void ec_sync(uint64 ec_DCtime, uint32 cycletime, int32 *t_off)
   {
-    uint64 adj_time = 0;
-    uint64 sync_err = (ref_time - shift_time) % cycle_time;
-    if (sync_err > (cycle_time / 2))
+    curr_DCtime = (uint32)(0xffffffff & ec_DCtime);
+
+    if (curr_DCtime > prev_DCtime)
     {
-      sync_err = sync_err - cycle_time;
+      diff_DCtime = curr_DCtime - prev_DCtime;
+    }
+    else
+    {
+      diff_DCtime = (0xffffffff - prev_DCtime) + curr_DCtime;
     }
 
-    Vp = Kp * sync_err;
-    Vi += Ki * sync_err;
+    prev_DCtime = curr_DCtime;
 
-    adj_time = -Vp - Vi;
-
-    if (adj_time > PI_SAT_VAL) adj_time = PI_SAT_VAL;
-    if (adj_time < -PI_SAT_VAL) adj_time = -PI_SAT_VAL;
-
-    return adj_time;
+    pi_sync(curr_DCtime, cycletime, t_off);
   }
+
+
+  void pi_sync(uint32 t_ref, uint32 cycletime, int32 *t_off)
+  {
+    static int32 integral = 0;
+    int32 delta = (t_ref - 1000000U) % cycletime;
+
+    if (delta > (cycletime / 2))
+    {
+      delta = delta - cycletime;
+    }
+    if (delta > 0) integral++;
+    if (delta < 0) integral--;
+
+    *t_off = -(delta / 100) - (integral / 20);
+  }
+
+  // const uint64 PI_SAT_VAL = 1000000U;
+  //
+  // double Vp = 0, Vi = 0;
+  // double Kp = 0.1, Ki = 0.0005;
+  //
+  // uint64 pi_sync(uint64 ref_time, uint64 cycle_time, int32 shift_time)
+  // {
+  //   uint64 adj_time = 0;
+  //   uint64 sync_err = (ref_time - shift_time) % cycle_time;
+  //   if (sync_err > (cycle_time / 2))
+  //   {
+  //     sync_err = sync_err - cycle_time;
+  //   }
+  //
+  //   Vp = Kp * sync_err;
+  //   Vi += Ki * sync_err;
+  //
+  //   adj_time = -Vp - Vi;
+  //
+  //   if (adj_time > PI_SAT_VAL) adj_time = PI_SAT_VAL;
+  //   if (adj_time < -PI_SAT_VAL) adj_time = -PI_SAT_VAL;
+  //
+  //   return adj_time;
+  // }
 
 public:
   int wkc = 0;
   delta::asda::ethercat::pdo::RxPDO4 rx_pdo[10];
   delta::asda::ethercat::pdo::TxPDO4 tx_pdo[10];
+
+  int32 t_off = 0;
 
   Master() { }
 
@@ -476,12 +492,6 @@ public:
   }
 
 
-  int ovf = 0;
-  uint64 dc_time;
-  uint64 dc_time_1;
-
-  int64 t_off = 0;
-
   int update()
   {
     for (int i = 0; i < ec_slavecount; i++)
@@ -499,27 +509,7 @@ public:
       tx_pdo[slave_idx] << ec_slave[slave_idx].inputs;
     }
 
-    // int64 t_off;
-    // ec_sync(ec_DCtime, 2000000U, &t_off);
-    // printf("t_off: %ld\n", t_off);
-
-    // printf("ec_DCtime: %ld\n", ec_DCtime);
-
-    // int64 dc_delta = ec_DCtime % 2000000U;
-
-    // dc_time_1 = dc_time;
-    // if (ec_DCtime / 2000000U == 0)
-    // {
-    //   ovf++;
-    //   dc_time = ovf * std::pow(2, 32) + ec_DCtime;
-    // }
-    // else
-    // {
-    //   dc_time = ovf * std::pow(2, 32) + ec_DCtime;
-    // }
-    // printf("dc_time: %lu\n", dc_time);
-    //
-    // ec_sync(dc_time, 2000000U, &t_off);
+    ec_sync(ec_DCtime, 2000000U, &t_off);
     return wkc;
   }
 
