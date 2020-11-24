@@ -99,30 +99,35 @@ private:
   }
 
 
-  uint32 prev_DCtime;
-  uint32 curr_DCtime;
-  uint32 diff_DCtime;
+  uint32 prev_DCtime32 = 0;
+  uint32 curr_DCtime32 = 0;
+  uint32 diff_DCtime32 = 0;
+
+  uint64 DCtime = 0;
 
   void ec_sync(uint64 ec_DCtime, uint32 cycletime, int32 *t_off)
   {
-    curr_DCtime = (uint32)(0xffffffff & ec_DCtime);
+    curr_DCtime32 = (uint32)(0xffffffff & ec_DCtime);
+    printf("DCtime32:\t%u\n", curr_DCtime32);
 
-    if (curr_DCtime > prev_DCtime)
+    if (curr_DCtime > prev_DCtime32)
     {
-      diff_DCtime = curr_DCtime - prev_DCtime;
+      diff_DCtime32 = curr_DCtime32 - prev_DCtime32;
     }
     else
     {
-      diff_DCtime = (0xffffffff - prev_DCtime) + curr_DCtime;
+      diff_DCtime32 = (0xffffffff - prev_DCtime32) + curr_DCtime32;
     }
 
-    prev_DCtime = curr_DCtime;
+    prev_DCtime32 = curr_DCtime32;
 
-    pi_sync(curr_DCtime, cycletime, t_off);
+    DCtime += diff_DCtime32;
+    printf("DCtime:\t%lu\n", DCtime);
+    pi_sync(DCtime, cycletime, t_off);
   }
 
 
-  void pi_sync(uint32 t_ref, uint32 cycletime, int32 *t_off)
+  void pi_sync(uint64 t_ref, uint64 cycletime, int32 *t_off)
   {
     static int32 integral = 0;
     int32 delta = (t_ref - 1000000U) % cycletime;

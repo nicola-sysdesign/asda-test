@@ -14,55 +14,36 @@
 #include <boost/program_options.hpp>
 
 #include "ethercat/master.h"
+#include "ethercat/time.h"
 
 #define POSITION_STEP_FACTOR  100000
 #define VELOCITY_STEP_FACTOR  100000
 
-#define NSEC_PER_SEC  1000000000
 
-
-void add_timespec(struct timespec *ts, int64 addtime)
-{
-   int64 sec, nsec;
-
-   nsec = addtime % NSEC_PER_SEC;
-   sec = (addtime - nsec) / NSEC_PER_SEC;
-   ts->tv_sec += sec;
-   ts->tv_nsec += nsec;
-   if ( ts->tv_nsec >= NSEC_PER_SEC )
-   {
-      nsec = ts->tv_nsec % NSEC_PER_SEC;
-      ts->tv_sec += (ts->tv_nsec - nsec) / NSEC_PER_SEC;
-      ts->tv_nsec = nsec;
-   }
-}
-
-
-int64 diff_timespec(struct timespec *t1, struct timespec *t2)
-{
-  int64 t1_nsec = t1->tv_sec * NSEC_PER_SEC + t1->tv_nsec;
-  int64 t2_nsec = t2->tv_sec * NSEC_PER_SEC + t2->tv_nsec;
-
-  return t1_nsec - t2_nsec;
-}
-
+using namespace delta::asda::ethercat;
 
 void* control_loop(void* arg)
 {
   delta::asda::ethercat::Master* ec_master = (delta::asda::ethercat::Master*)arg;
 
-  int64 cycletime = 2000000U;
-
-  struct timespec t, t_1;
+  struct timespec t, t_1, t0_cmd;
   clock_gettime(CLOCK_MONOTONIC, &t);
 
   for (int iter = 1; iter < 1800000; iter++)
   {
-    add_timespec(&t, cycletime + ec_master->t_off);
+    add_timespec(&t, 2000000U + ec_master->t_off);
+    printf("t_add:\t%d\n", 2000000U + ec_master->t_off);
 
     struct timespec t_left;
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, &t_left);
-    printf("t_off: %d\n", ec_master->t_off);
+
+    struct timespec t_period;
+    diff_timespec(t, t_1, &t_period);
+
+    if (to_nsec(t_period) < 1900000 || 2100000 < to_nsec(t_period))
+    {
+      printf("t_period: %lu", to_nsec(t_period));
+    }
 
     if (iter == 50)
     {
@@ -120,9 +101,12 @@ void* control_loop(void* arg)
       }
     }
 
-    if (iter > 500)
+    if (iter == 500) t0_cmd = t;
+    if (iter >= 500)
     {
-      // auto t_cmd = t - 500 * std::chrono::milliseconds(2) - t0;
+      struct timespec t_cmd;
+      diff_timespec(t, t0_cmd, &t_cmd);
+      printf("t_cmd: %.3f\n", t_cmd.tv_sec + t_cmd.tv_nsec / 1000000000.0);
 
       for (int i = 0; i < ec_slavecount; i++)
       {
