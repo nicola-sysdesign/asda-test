@@ -4,7 +4,7 @@
 #include <vector>
 #include <chrono>
 #include <thread>
-//
+// Unix
 #include <unistd.h>
 #include <pthread.h>
 #include <sched.h>
@@ -19,10 +19,6 @@
 #define POSITION_STEP_FACTOR  100000
 #define VELOCITY_STEP_FACTOR  100000
 
-#define NSEC_PER_SEC  1000000000
-
-
-using namespace delta::asda::ethercat;
 
 void* control_loop(void* arg)
 {
@@ -33,19 +29,17 @@ void* control_loop(void* arg)
 
   for (int iter = 0; iter < 1800000; iter++)
   {
-    add_timespec(&t, 2000000U + ec_master->t_off);
-    // printf("t_off:\t%d\n", ec_master->t_off);
-    // printf("t_add:\t%d\n", 2000000U + ec_master->t_off);
+    delta::asda::ethercat::add_timespec(&t, 2000000U + ec_master->t_off);
 
     struct timespec t_left;
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, &t_left);
 
     struct timespec t_period;
-    diff_timespec(t, t_1, &t_period);
+    delta::asda::ethercat::diff_timespec(t, t_1, &t_period);
 
-    if (to_nsec(t_period) < 1900000 || 2100000 < to_nsec(t_period))
+    if (delta::asda::ethercat::to_nsec(t_period) < 1900000 || 2100000 < delta::asda::ethercat::to_nsec(t_period))
     {
-      printf("t_period: %lu", to_nsec(t_period));
+      printf("t_period: %lu\n", delta::asda::ethercat::to_nsec(t_period));
     }
 
     if (iter == 50)
@@ -108,7 +102,7 @@ void* control_loop(void* arg)
     if (iter >= 500)
     {
       struct timespec t_cmd;
-      diff_timespec(t, t0_cmd, &t_cmd);
+      delta::asda::ethercat::diff_timespec(t, t0_cmd, &t_cmd);
 
       for (int i = 0; i < ec_slavecount; i++)
       {
@@ -117,7 +111,7 @@ void* control_loop(void* arg)
         uint16 status_word = ec_master->tx_pdo[slave_idx].status_word;
         int32 actual_position = ec_master->tx_pdo[slave_idx].actual_position;
 
-        int32 target_position = 0.5 * POSITION_STEP_FACTOR * (1 - std::cos(M_PI * to_sec(t_cmd)));
+        int32 target_position = 0.5 * 10 * POSITION_STEP_FACTOR * (1 - std::cos(M_PI * delta::asda::ethercat::to_sec(t_cmd)));
         ec_master->rx_pdo[slave_idx].interpolated_position_command = target_position;
       }
     }

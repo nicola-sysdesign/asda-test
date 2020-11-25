@@ -98,19 +98,16 @@ private:
     return true;
   }
 
-
   uint32 prev_DCtime32 = 0;
   uint32 curr_DCtime32 = 0;
   uint32 diff_DCtime32 = 0;
-
   uint64 DCtime = 0;
 
   void ec_sync(uint64 ec_DCtime, uint32 cycletime, int32 *t_off)
   {
     curr_DCtime32 = (uint32)(0xffffffff & ec_DCtime);
-    printf("DCtime32:\t%u\n", curr_DCtime32);
 
-    if (curr_DCtime > prev_DCtime32)
+    if (curr_DCtime32 > prev_DCtime32)
     {
       diff_DCtime32 = curr_DCtime32 - prev_DCtime32;
     }
@@ -122,7 +119,6 @@ private:
     prev_DCtime32 = curr_DCtime32;
 
     DCtime += diff_DCtime32;
-    printf("DCtime:\t%lu\n", DCtime);
     pi_sync(DCtime, cycletime, t_off);
   }
 
@@ -130,7 +126,7 @@ private:
   void pi_sync(uint64 t_ref, uint64 cycletime, int32 *t_off)
   {
     static int32 integral = 0;
-    int32 delta = (t_ref - 1000000U) % cycletime;
+    int32 delta = (t_ref - (cycletime / 2)) % cycletime;
 
     if (delta > (cycletime / 2))
     {
@@ -142,37 +138,13 @@ private:
     *t_off = -(delta / 100) - (integral / 20);
   }
 
-  // const uint64 PI_SAT_VAL = 1000000U;
-  //
-  // double Vp = 0, Vi = 0;
-  // double Kp = 0.1, Ki = 0.0005;
-  //
-  // uint64 pi_sync(uint64 ref_time, uint64 cycle_time, int32 shift_time)
-  // {
-  //   uint64 adj_time = 0;
-  //   uint64 sync_err = (ref_time - shift_time) % cycle_time;
-  //   if (sync_err > (cycle_time / 2))
-  //   {
-  //     sync_err = sync_err - cycle_time;
-  //   }
-  //
-  //   Vp = Kp * sync_err;
-  //   Vi += Ki * sync_err;
-  //
-  //   adj_time = -Vp - Vi;
-  //
-  //   if (adj_time > PI_SAT_VAL) adj_time = PI_SAT_VAL;
-  //   if (adj_time < -PI_SAT_VAL) adj_time = -PI_SAT_VAL;
-  //
-  //   return adj_time;
-  // }
-
 public:
+  unsigned long t_cycle; int t_off = 0;
+
   int wkc = 0;
   delta::asda::ethercat::pdo::RxPDO4 rx_pdo[10];
   delta::asda::ethercat::pdo::TxPDO4 tx_pdo[10];
 
-  int32 t_off = 0;
 
   Master() { }
 
@@ -283,20 +255,19 @@ public:
   }
 
 
+  int set_position_window(uint16 slave_idx, uint32 position_window, uint16 position_window_time)
+  {
+    wkc += writeSDO<uint32>(slave_idx, POSITION_WINDOW_IDX, 0x00, position_window);
+    wkc += writeSDO<uint16>(slave_idx, POSITION_WINDOW_TIME_IDX, 0x00, position_window_time);
+    return wkc;
+  }
+
+
   int config_profile(uint16 slave_idx, uint32 profile_velocity, uint32 profile_acceleration, uint32 profile_deceleration)
   {
     wkc += writeSDO(slave_idx, PROFILE_VELOCITY_IDX, 0x00, profile_velocity);
     wkc += writeSDO(slave_idx, PROFILE_ACCELERATION_IDX, 0x00, profile_acceleration);
     wkc += writeSDO(slave_idx, PROFILE_DECELERATION_IDX, 0x00, profile_deceleration);
-    return wkc;
-  }
-
-
-  int config_position_interpolation(uint16 slave_idx, interpolation_sub_mode_t interpolation_sub_mode_select, uint8 interpolation_time_units, int8 interpolation_time_index = -3)
-  {
-    wkc += writeSDO<int16>(slave_idx, INTERPOLATION_SUB_MODE_SELECT_IDX, 0x00, interpolation_sub_mode_select);
-    wkc += writeSDO<uint8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x01, interpolation_time_units);
-    wkc += writeSDO<int8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x02, interpolation_time_index);
     return wkc;
   }
 
@@ -308,10 +279,11 @@ public:
   }
 
 
-  int set_position_window(uint16 slave_idx, uint32 position_window, uint16 position_window_time)
+  int config_position_interpolation(uint16 slave_idx, interpolation_sub_mode_t interpolation_sub_mode_select, uint8 interpolation_time_units, int8 interpolation_time_index = -3)
   {
-    wkc += writeSDO<uint32>(slave_idx, POSITION_WINDOW_IDX, 0x00, position_window);
-    wkc += writeSDO<uint16>(slave_idx, POSITION_WINDOW_TIME_IDX, 0x00, position_window_time);
+    wkc += writeSDO<int16>(slave_idx, INTERPOLATION_SUB_MODE_SELECT_IDX, 0x00, interpolation_sub_mode_select);
+    wkc += writeSDO<uint8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x01, interpolation_time_units);
+    wkc += writeSDO<int8>(slave_idx, INTERPOLATION_TIME_PERIOD_IDX, 0x02, interpolation_time_index);
     return wkc;
   }
 

@@ -20,8 +20,6 @@
 #define VELOCITY_STEP_FACTOR  100000
 
 
-using namespace delta::asda::ethercat;
-
 void* control_loop(void* arg)
 {
   delta::asda::ethercat::Master* ec_master = (delta::asda::ethercat::Master*)arg;
@@ -31,18 +29,17 @@ void* control_loop(void* arg)
 
   for (int iter = 1; iter < 1800000; iter++)
   {
-    add_timespec(&t, 2000000U + ec_master->t_off);
-    printf("t_add:\t%d\n", 2000000U + ec_master->t_off);
+    delta::asda::ethercat::add_timespec(&t, 2000000U + ec_master->t_off);
 
     struct timespec t_left;
     clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, &t_left);
 
     struct timespec t_period;
-    diff_timespec(t, t_1, &t_period);
+    delta::asda::ethercat::diff_timespec(t, t_1, &t_period);
 
-    if (to_nsec(t_period) < 1900000 || 2100000 < to_nsec(t_period))
+    if (delta::asda::ethercat::to_nsec(t_period) < 1900000 || 2100000 < delta::asda::ethercat::to_nsec(t_period))
     {
-      printf("t_period: %lu", to_nsec(t_period));
+      printf("t_period: %lu\n", delta::asda::ethercat::to_nsec(t_period));
     }
 
     if (iter == 50)
@@ -105,8 +102,7 @@ void* control_loop(void* arg)
     if (iter >= 500)
     {
       struct timespec t_cmd;
-      diff_timespec(t, t0_cmd, &t_cmd);
-      printf("t_cmd: %.3f\n", t_cmd.tv_sec + t_cmd.tv_nsec / 1000000000.0);
+      delta::asda::ethercat::diff_timespec(t, t0_cmd, &t_cmd);
 
       for (int i = 0; i < ec_slavecount; i++)
       {
@@ -182,12 +178,12 @@ int main(int argc, char* argv[])
   {
     const uint16 slave_idx = 1 + i;
 
+    uint32 numerator = 128, feed_costant = 10;
+    ec_master.set_position_factor(slave_idx, numerator, feed_costant);
+
     int32 actual_position;
     ec_master.get_actual_position(slave_idx, actual_position);
     ec_master.set_position_offset(slave_idx, actual_position);
-
-    uint32 numerator = 128, feed_costant = 10;
-    ec_master.set_position_factor(slave_idx, numerator, feed_costant);
   }
 
   if (!ec_master.start())
